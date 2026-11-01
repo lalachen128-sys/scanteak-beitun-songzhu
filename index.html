@@ -1,0 +1,475 @@
+
+
+<!DOCTYPE html>
+
+<html lang="zh-Hant">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>北屯松竹店｜家具報價系統</title>
+
+<style>
+
+*{box-sizing:border-box}
+
+body{margin:0;background:#f5f3ee;color:#29372e;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif}
+
+header{background:#294b3b;color:white;padding:22px 16px;text-align:center}
+
+header h1{font-size:23px;margin:0 0 8px}
+
+header p{margin:0;font-size:14px}
+
+main{max-width:850px;margin:auto;padding:15px}
+
+section{background:white;border-radius:13px;padding:17px;margin-bottom:16px;box-shadow:0 2px 8px #0000000a}
+
+h2{font-size:19px;margin:0 0 15px;color:#294b3b}
+
+label{display:block;font-size:13px;margin:12px 0 5px}
+
+input,select,textarea{width:100%;padding:12px;border:1px solid #d5d9d4;border-radius:8px;font-size:16px;background:white;color:#222}
+
+textarea{min-height:75px}
+
+button{background:#294b3b;color:white;border:0;border-radius:8px;padding:12px 15px;font-size:15px;cursor:pointer}
+
+button.secondary{background:#e6ebe6;color:#294b3b}
+
+button.danger{background:#a34646}
+
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:15px}
+
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+.full{grid-column:1/-1}
+
+.item{border:1px solid #e1e5df;border-radius:10px;padding:12px;margin:12px 0}
+
+.item img{width:100%;max-height:210px;object-fit:contain;background:#f5f5f5;border-radius:8px}
+
+.muted{color:#777;font-size:13px}
+
+.price{font-size:19px;font-weight:bold;color:#294b3b}
+
+.total{font-size:27px;font-weight:bold;text-align:right;color:#294b3b}
+
+.row{display:flex;justify-content:space-between;gap:10px;align-items:center}
+
+.row input{max-width:100px}
+
+hr{border:0;border-top:1px solid #eee;margin:15px 0}
+
+@media(max-width:480px){.grid{grid-template-columns:1fr}}
+
+@media print{
+
+header,.no-print,#catalogSection,#productSection{display:none!important}
+
+body{background:white}
+
+section{box-shadow:none;border:1px solid #ddd}
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<header>
+
+<h1>詩肯柚木／詩肯居家</h1>
+
+<p>北屯松竹店｜家具報價系統</p>
+
+</header>
+
+<main>
+
+<section>
+
+<h2>客戶報價資料</h2>
+
+<div class="grid">
+
+<div><label>客戶姓名</label><input id="customer" placeholder="請輸入客戶姓名"></div>
+
+<div><label>報價日期</label><input id="date" type="date"></div>
+
+<div><label>報價單號</label><input id="quoteNo"></div>
+
+<div><label>業務人員</label><input id="staff" placeholder="業務姓名"></div>
+
+</div>
+
+</section>
+
+<section id="catalogSection">
+
+<h2>商品選購</h2>
+
+<input id="search" placeholder="搜尋商品名稱或型號" oninput="renderProducts()">
+
+<div id="products"></div>
+
+</section>
+
+<section id="productSection">
+
+<h2>新增／修改商品</h2>
+
+<p class="muted">可自行建立商品資料。照片請使用可公開存取的圖片網址。</p>
+
+<input id="editId" type="hidden">
+
+<label>商品名稱</label><input id="pname" placeholder="例如：三人座全牛皮沙發">
+
+<div class="grid">
+
+<div><label>商品型號</label><input id="model"></div>
+
+<div><label>原價 NT$</label><input id="price" type="number" min="0"></div>
+
+<div><label>商品尺寸</label><input id="size" placeholder="寬 × 深 × 高 cm"></div>
+
+<div><label>商品材質</label><input id="material"></div>
+
+</div>
+
+<label>商品照片網址</label>
+
+<input id="photo" placeholder="https://...">
+
+<div class="actions">
+
+<button onclick="saveProduct()">儲存商品</button>
+
+<button class="secondary" onclick="clearForm()">清空欄位</button>
+
+</div>
+
+</section>
+
+<section id="quoteSection">
+
+<h2>家具報價單</h2>
+
+<div id="cart"></div>
+
+<hr>
+
+<div class="total" id="total">總金額 NT$ 0</div>
+
+<label>備註／交貨說明</label>
+
+<textarea id="notes" placeholder="可填寫交貨、付款或其他報價說明"></textarea>
+
+<div class="actions no-print">
+
+<button onclick="shareQuote()">分享報價內容</button>
+
+<button class="secondary" onclick="window.print()">列印／儲存 PDF</button>
+
+<button class="danger" onclick="clearCart()">清空報價單</button>
+
+</div>
+
+</section>
+
+<p class="muted">本報價系統為門市使用工具，價格及商品資訊請以實際確認內容為準。</p>
+
+</main>
+
+<script>
+
+const money=n=>"NT$ "+Math.round(n).toLocaleString("zh-TW");
+
+const key="songzhu_products_v1";
+
+const cartKey="songzhu_cart_v1";
+
+let products=JSON.parse(localStorage.getItem(key)||"null")||[
+
+{id:1,name:"示範商品｜三人座沙發",model:"DEMO-001",price:30000,size:"請填入實際尺寸",material:"請填入實際材質",photo:""},
+
+{id:2,name:"示範商品｜柚木餐桌",model:"DEMO-002",price:20000,size:"請填入實際尺寸",material:"請填入實際材質",photo:""}
+
+];
+
+let cart=JSON.parse(localStorage.getItem(cartKey)||"[]");
+
+const el=id=>document.getElementById(id);
+
+const save=()=>{
+
+localStorage.setItem(key,JSON.stringify(products));
+
+localStorage.setItem(cartKey,JSON.stringify(cart));
+
+};
+
+const safe=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function renderProducts(){
+
+const q=el("search").value.toLowerCase();
+
+const list=products.filter(p=>(p.name+" "+p.model).toLowerCase().includes(q));
+
+el("products").innerHTML=list.map(p=>`
+
+<div class="item">
+
+${p.photo?`<img src="${safe(p.photo)}" alt="商品照片">`:""}
+
+<h3>${safe(p.name)}</h3>
+
+<p class="muted">型號：${safe(p.model)}<br>尺寸：${safe(p.size)}<br>材質：${safe(p.material)}</p>
+
+<div class="price">${money(p.price)}</div>
+
+<div class="actions">
+
+<button onclick="addCart(${p.id})">加入報價單</button>
+
+<button class="secondary" onclick="editProduct(${p.id})">修改</button>
+
+<button class="danger" onclick="deleteProduct(${p.id})">刪除</button>
+
+</div></div>`).join("")||"<p>找不到商品</p>";
+
+}
+
+function clearForm(){
+
+["editId","pname","model","price","size","material","photo"].forEach(id=>el(id).value="");
+
+}
+
+function saveProduct(){
+
+const name=el("pname").value.trim();
+
+const price=Number(el("price").value);
+
+if(!name||!Number.isFinite(price)||price<0||el("price").value===""){
+
+alert("請填寫商品名稱與正確原價");return;
+
+}
+
+const id=Number(el("editId").value)||Date.now();
+
+const p={id,name,model:el("model").value,price,size:el("size").value,material:el("material").value,photo:el("photo").value.trim()};
+
+const index=products.findIndex(x=>x.id===id);
+
+if(index>=0)products[index]=p;else products.push(p);
+
+save();clearForm();renderProducts();alert("商品已儲存");
+
+}
+
+function editProduct(id){
+
+const p=products.find(x=>x.id===id);
+
+if(!p)return;
+
+el("editId").value=p.id;
+
+el("pname").value=p.name;
+
+el("model").value=p.model;
+
+el("price").value=p.price;
+
+el("size").value=p.size;
+
+el("material").value=p.material;
+
+el("photo").value=p.photo;
+
+el("productSection").scrollIntoView({behavior:"smooth"});
+
+}
+
+function deleteProduct(id){
+
+if(!confirm("確定刪除商品？"))return;
+
+products=products.filter(p=>p.id!==id);
+
+save();renderProducts();
+
+}
+
+function addCart(id){
+
+const p=products.find(x=>x.id===id);
+
+if(!p)return;
+
+const row=cart.find(x=>x.id===id);
+
+if(row)row.qty++;else cart.push({...p,qty:1,discount:100});
+
+save();renderCart();
+
+el("quoteSection").scrollIntoView({behavior:"smooth"});
+
+}
+
+function updateCart(id,field,value){
+
+const row=cart.find(x=>x.id===id);
+
+if(!row)return;
+
+let n=Number(value);
+
+if(!Number.isFinite(n))return;
+
+row[field]=field==="qty"?Math.max(1,Math.floor(n)):Math.max(0,Math.min(100,n));
+
+save();renderCart();
+
+}
+
+function removeCart(id){
+
+cart=cart.filter(x=>x.id!==id);save();renderCart();
+
+}
+
+function clearCart(){
+
+if(confirm("確定清空報價單？")){cart=[];save();renderCart();}
+
+}
+
+function renderCart(){
+
+let total=0;
+
+el("cart").innerHTML=cart.map(p=>{
+
+const subtotal=Math.round(p.price*p.qty*p.discount/100);
+
+total+=subtotal;
+
+return `<div class="item">
+
+<h3>${safe(p.name)}</h3>
+
+<p class="muted">型號：${safe(p.model)}｜尺寸：${safe(p.size)}</p>
+
+<p>原價：${money(p.price)}</p>
+
+<div class="grid">
+
+<div><label>數量</label><input type="number" min="1" value="${p.qty}" onchange="updateCart(${p.id},'qty',this.value)"></div>
+
+<div><label>售價比例（100＝原價，70＝七折）</label><input type="number" min="0" max="100" value="${p.discount}" onchange="updateCart(${p.id},'discount',this.value)"></div>
+
+</div>
+
+<p class="price">小計：${money(subtotal)}</p>
+
+<button class="danger no-print" onclick="removeCart(${p.id})">移除</button>
+
+</div>`;
+
+}).join("")||"<p class='muted'>尚未加入商品</p>";
+
+el("total").textContent="總金額 "+money(total);
+
+}
+
+function quoteText(){
+
+let sum=0;
+
+let lines=[
+
+"詩肯柚木／詩肯居家 北屯松竹店",
+
+"家具報價單",
+
+"客戶："+el("customer").value,
+
+"日期："+el("date").value,
+
+"單號："+el("quoteNo").value,
+
+"業務："+el("staff").value,
+
+"--------------------------"
+
+];
+
+cart.forEach(p=>{
+
+const amount=Math.round(p.price*p.qty*p.discount/100);
+
+sum+=amount;
+
+lines.push(p.name+"（"+p.model+"）");
+
+lines.push("尺寸："+p.size);
+
+lines.push("原價："+money(p.price)+"｜數量："+p.qty);
+
+lines.push("售價比例："+p.discount+"%");
+
+lines.push("小計："+money(amount));
+
+});
+
+lines.push("--------------------------");
+
+lines.push("總金額："+money(sum));
+
+lines.push("備註："+el("notes").value);
+
+return lines.join("\n");
+
+}
+
+async function shareQuote(){
+
+if(!cart.length){alert("請先加入商品");return;}
+
+const content=quoteText();
+
+if(navigator.share){
+
+try{await navigator.share({title:"家具報價單",text:content});return;}
+
+catch(e){if(e.name==="AbortError")return;}
+
+}
+
+try{await navigator.clipboard.writeText(content);alert("報價內容已複製，可貼到 LINE");}
+
+catch(e){prompt("請複製報價內容",content);}
+
+}
+
+el("date").value=new Date().toLocaleDateString("en-CA");
+
+el("quoteNo").value="SZ-"+Date.now().toString().slice(-8);
+
+renderProducts();renderCart();
+
+</script>
+
+</body>
+
+</html>
